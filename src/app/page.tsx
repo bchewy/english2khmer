@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Box, Button, VStack, Text, useToast } from '@chakra-ui/react'
 import useWebSocket from 'react-use-websocket'
 
 function createWavHeader(sampleRate: number, bitsPerSample: number, channels: number, dataLength: number) {
@@ -48,7 +47,6 @@ export default function Home() {
     const audioContextRef = useRef<AudioContext | null>(null)
     const audioWorkletNodeRef = useRef<AudioWorkletNode | null>(null)
     const mediaStreamRef = useRef<MediaStream | null>(null)
-    const toast = useToast()
 
     const { sendMessage } = useWebSocket('ws://localhost:3001', {
         onMessage: (event) => {
@@ -60,28 +58,11 @@ export default function Home() {
                         english: data.text || '',
                         khmer: data.translation
                     }])
-                } else if (data.type === 'error') {
-                    console.error('Server error:', data.message)
-                    toast({
-                        title: 'Server Error',
-                        description: data.message,
-                        status: 'error',
-                        duration: 5000,
-                    })
                 }
             } catch (error) {
                 console.error('Error parsing WebSocket message:', error)
             }
         },
-        onError: (error) => {
-            console.error('WebSocket error:', error)
-            toast({
-                title: 'Connection Error',
-                description: 'Failed to connect to translation server',
-                status: 'error',
-                duration: 3000,
-            })
-        }
     })
 
     const handleStartRecording = async () => {
@@ -110,48 +91,37 @@ export default function Home() {
 
             workletNode.port.onmessage = (event) => {
                 if (event.data.audioData) {
-                    try {
-                        console.log('Received audio data from worklet:', {
-                            length: event.data.audioData.length,
-                            sampleRate: event.data.sampleRate
-                        })
+                    console.log('Received audio data from worklet:', {
+                        length: event.data.audioData.length,
+                        sampleRate: event.data.sampleRate
+                    })
 
-                        // Create WAV header
-                        const wavHeader = createWavHeader(
-                            event.data.sampleRate,
-                            16, // bits per sample
-                            1,  // channels
-                            event.data.audioData.length * 2 // data length (2 bytes per sample)
-                        )
+                    // Create WAV header
+                    const wavHeader = createWavHeader(
+                        event.data.sampleRate,
+                        16, // bits per sample
+                        1,  // channels
+                        event.data.audioData.length * 2 // data length (2 bytes per sample)
+                    )
 
-                        // Combine header and audio data
-                        const audioBuffer = new ArrayBuffer(event.data.audioData.length * 2)
-                        const view = new DataView(audioBuffer)
-                        for (let i = 0; i < event.data.audioData.length; i++) {
-                            view.setInt16(i * 2, event.data.audioData[i], true)
-                        }
-
-                        const wavBlob = new Blob([wavHeader, audioBuffer], { type: 'audio/wav' })
-                        const reader = new FileReader()
-                        reader.onloadend = () => {
-                            const base64data = (reader.result as string).split(',')[1]
-                            sendMessage(JSON.stringify({
-                                type: 'audio',
-                                data: base64data,
-                                format: 'wav'
-                            }))
-                        }
-                        reader.readAsDataURL(wavBlob)
-
-                    } catch (error) {
-                        console.error('Error processing audio data:', error)
-                        toast({
-                            title: 'Error Processing Audio',
-                            description: 'Failed to process audio data',
-                            status: 'error',
-                            duration: 3000,
-                        })
+                    // Combine header and audio data
+                    const audioBuffer = new ArrayBuffer(event.data.audioData.length * 2)
+                    const view = new DataView(audioBuffer)
+                    for (let i = 0; i < event.data.audioData.length; i++) {
+                        view.setInt16(i * 2, event.data.audioData[i], true)
                     }
+
+                    const wavBlob = new Blob([wavHeader, audioBuffer], { type: 'audio/wav' })
+                    const reader = new FileReader()
+                    reader.onloadend = () => {
+                        const base64data = (reader.result as string).split(',')[1]
+                        sendMessage(JSON.stringify({
+                            type: 'audio',
+                            data: base64data,
+                            format: 'wav'
+                        }))
+                    }
+                    reader.readAsDataURL(wavBlob)
                 }
             }
 
@@ -163,11 +133,6 @@ export default function Home() {
             setIsRecording(true)
         } catch (error) {
             console.error('Error starting recording:', error)
-            toast({
-                title: 'Error starting recording',
-                status: 'error',
-                duration: 3000,
-            })
         }
     }
 
@@ -187,35 +152,83 @@ export default function Home() {
     }
 
     return (
-        <Box p={8} maxW="800px" mx="auto" bg="gray.900" color="white">
-            <Text fontSize="2xl" mb={4} textAlign="center">English to Khmer Live Translation</Text>
-            
-            <Box textAlign="center" mb={6}>
-                <Button
-                    colorScheme={isRecording ? "red" : "green"}
-                    onClick={isRecording ? handleStopRecording : handleStartRecording}
-                    size="lg"
-                    px={8}
-                >
-                    {isRecording ? 'Stop Recording' : 'Start Recording'}
-                </Button>
-            </Box>
+        <div className="px-6 py-24 sm:py-32 lg:px-8">
+            <div className="mx-auto max-w-2xl text-center">
+                <h1 className="text-4xl font-bold tracking-tight sm:text-6xl bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-violet-500 pb-2">
+                    English to Khmer
+                </h1>
+                <p className="mt-6 text-lg leading-8 text-gray-300">
+                    Speak in English and get real-time translations in Khmer
+                </p>
+            </div>
 
-            <VStack spacing={4} align="stretch" maxH="70vh" overflowY="auto">
-                {translations.map((item, index) => (
-                    <Box 
-                        key={index} 
-                        p={4} 
-                        borderWidth="1px" 
-                        borderRadius="md" 
-                        bg="gray.800"
-                        borderColor="gray.600"
-                    >
-                        <Text mb={2}><strong>English:</strong> {item.english}</Text>
-                        <Text><strong>ខ្មែរ:</strong> {item.khmer}</Text>
-                    </Box>
-                ))}
-            </VStack>
-        </Box>
+            <div className="mt-10 flex justify-center">
+                <button
+                    onClick={isRecording ? handleStopRecording : handleStartRecording}
+                    className={`
+                        relative inline-flex items-center gap-x-2 rounded-full px-8 py-4 text-lg font-semibold 
+                        shadow-sm transition-all duration-300 ease-in-out transform hover:scale-105
+                        ${isRecording 
+                            ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
+                            : 'bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-600 hover:via-purple-600 hover:to-pink-600'
+                        }
+                    `}
+                >
+                    {isRecording ? (
+                        <>
+                            <span className="relative flex h-3 w-3">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-200 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-300"></span>
+                            </span>
+                            Stop Recording
+                        </>
+                    ) : (
+                        <>
+                            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                            </svg>
+                            Start Recording
+                        </>
+                    )}
+                </button>
+            </div>
+
+            <div className="mt-10 mx-auto max-w-2xl">
+                <div className="space-y-4 max-h-[60vh] overflow-y-auto rounded-2xl bg-white/5 p-4 backdrop-blur-lg ring-1 ring-white/10">
+                    {translations.length === 0 ? (
+                        <div className="text-center py-10 text-gray-400">
+                            <svg className="mx-auto h-12 w-12 opacity-50" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                            </svg>
+                            <p className="mt-4">Start speaking to see translations</p>
+                        </div>
+                    ) : (
+                        translations.map((item, index) => (
+                            <div
+                                key={index}
+                                className={`
+                                    rounded-lg p-4 transition-all duration-300 ease-in-out
+                                    ${index === translations.length - 1 
+                                        ? 'bg-gradient-to-r from-purple-500/10 to-pink-500/10 ring-1 ring-purple-500/20' 
+                                        : 'bg-white/5'
+                                    }
+                                `}
+                            >
+                                <div className="space-y-2">
+                                    <div>
+                                        <span className="text-xs font-medium text-gray-400">English</span>
+                                        <p className="mt-1 text-sm text-gray-200">{item.english}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs font-medium text-gray-400">ខ្មែរ</span>
+                                        <p className="mt-1 text-sm text-gray-200">{item.khmer}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+        </div>
     )
 }
