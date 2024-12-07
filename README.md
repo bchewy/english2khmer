@@ -112,10 +112,6 @@ npm run dev
 - Use environment variables for all sensitive information
 - Regularly check for security vulnerabilities with `npm audit`
 
-## License
-
-MIT License - see the [LICENSE](LICENSE) file for details
-
 ## Acknowledgments
 
 - OpenAI for providing the Whisper and GPT-4 APIs
